@@ -5,26 +5,28 @@ CLASS zcl_work_order_validator DEFINITION
 
   PUBLIC SECTION.
     METHODS:
+
+      constructor,
 *     Declaration of the method that validates the creation of the work orders
       validate_create_order IMPORTING iv_customer_id   TYPE string
                                       iv_technician_id TYPE string
                                       iv_priority      TYPE string
-                            RETURNING VALUE(rv_valid)  TYPE abap_bool,
+                            RETURNING VALUE(rv_valid)  TYPE string,
 
 *     Declaration of the method that validates the update of the work orders
       validate_update_order IMPORTING iv_work_order_id TYPE string
                                       iv_status        TYPE string
-                            RETURNING VALUE(rv_valid)  TYPE abap_bool,
+                            RETURNING VALUE(rv_valid)  TYPE string,
 
 *     Declaration of the method that validates the delete of the work orders
       validate_delete_order IMPORTING iv_work_order_id TYPE string
-                                      iv_status        TYPE string
-                            RETURNING VALUE(rv_valid)  TYPE abap_bool,
+                                      iv_status        TYPE zde_status_code
+                            RETURNING VALUE(rv_valid)  TYPE string,
 
 *     Declaration of the method that validates the statuses and priorities of the work orders
       validate_status_and_priority IMPORTING iv_status       TYPE string
                                              iv_priority     TYPE string
-                                   RETURNING VALUE(rv_valid) TYPE abap_bool.
+                                   RETURNING VALUE(rv_valid) TYPE string.
 
 
   PROTECTED SECTION.
@@ -33,6 +35,8 @@ CLASS zcl_work_order_validator DEFINITION
                c_valid_priority TYPE string VALUE 'A B'. " Example priorities: High, Low
 
     METHODS:
+
+
       check_customer_exists IMPORTING iv_customer_id   TYPE string
                             RETURNING VALUE(rv_exists) TYPE abap_bool,
       check_technician_exists IMPORTING iv_technician_id TYPE string
@@ -47,18 +51,22 @@ ENDCLASS.
 
 CLASS zcl_work_order_validator IMPLEMENTATION.
 
+  METHOD constructor.
+  ENDMETHOD.
+
+
   METHOD validate_create_order.
     " Check if customer exists
     DATA(lv_customer_exists) = check_customer_exists( iv_customer_id ).
     IF lv_customer_exists IS INITIAL.
-      rv_valid = abap_false.
+      rv_valid = TEXT-001.
       RETURN.
     ENDIF.
 
     " Check if technician exists
     DATA(lv_technician_exists) = check_technician_exists( iv_technician_id ).
     IF lv_technician_exists IS INITIAL.
-      rv_valid = abap_false.
+      rv_valid = TEXT-002.
       RETURN.
     ENDIF.
 
@@ -66,58 +74,71 @@ CLASS zcl_work_order_validator IMPLEMENTATION.
 
     " Check if priority is 1 character long
     IF lv_long NE 1.
-      rv_valid = abap_false.
+      rv_valid = TEXT-003.
       RETURN.
     ENDIF.
 
     " Check if priority is valid
-    IF iv_priority NS c_valid_priority.
-      rv_valid = abap_false.
+    IF  c_valid_priority NS iv_priority.
+      rv_valid = TEXT-003.
       RETURN.
     ENDIF.
 
-    rv_valid = abap_true.
+    CLEAR rv_valid.
+
+    RETURN.
   ENDMETHOD.
 
   METHOD validate_update_order.
+
+    DATA(lv_long) = strlen( iv_status ).
+
     " Check if the work order exists
     DATA(lv_order_exists) = check_order_exists( iv_work_order_id ).
     IF lv_order_exists IS INITIAL.
-      rv_valid = abap_false.
+      rv_valid = TEXT-005.
+      RETURN.
+    ENDIF.
+
+    " Check if status is 2 character long
+    IF lv_long NE 2.
+      rv_valid = TEXT-004.
       RETURN.
     ENDIF.
 
     " Check if the order status is editable (e.g., Pending)
-    IF iv_status NS c_valid_status.
-      rv_valid = abap_false.
+    IF c_valid_status NS iv_status .
+      rv_valid = TEXT-004.
       RETURN.
     ENDIF.
 
-    rv_valid = abap_true.
+    CLEAR rv_valid.
+    RETURN.
   ENDMETHOD.
 
   METHOD validate_delete_order.
     " Check if the order exists
     DATA(lv_order_exists) = check_order_exists( iv_work_order_id ).
     IF lv_order_exists IS INITIAL.
-      rv_valid = abap_false.
+      rv_valid = TEXT-005.
       RETURN.
     ENDIF.
 
     " Check if the order status is "PE" (Pending)
     IF iv_status NE 'PE'.
-      rv_valid = abap_false.
+      rv_valid = TEXT-007.
       RETURN.
     ENDIF.
 
     " Check if the order has a history (i.e., if it has been modified before)
     DATA(lv_has_history) = check_order_history( iv_work_order_id ).
     IF lv_has_history IS NOT INITIAL.
-      rv_valid = abap_false.
+      rv_valid = TEXT-006.
       RETURN.
     ENDIF.
 
-    rv_valid = abap_true.
+    CLEAR rv_valid.
+    RETURN.
   ENDMETHOD.
 
   METHOD validate_status_and_priority.
@@ -128,13 +149,13 @@ CLASS zcl_work_order_validator IMPLEMENTATION.
     DATA(lv_long) = strlen( iv_status ).
 
     IF lv_long NE 2.
-      rv_valid = abap_false.
+      rv_valid = TEXT-004.
       RETURN.
     ENDIF.
 
     " Validate the status value
-    IF iv_status NS c_valid_status.
-      rv_valid = abap_false.
+    IF c_valid_status NS iv_status .
+      rv_valid = TEXT-004.
       RETURN.
     ENDIF.
 
@@ -145,17 +166,18 @@ CLASS zcl_work_order_validator IMPLEMENTATION.
     lv_long = strlen( iv_priority ).
 
     IF lv_long NE 1.
-      rv_valid = abap_false.
+      rv_valid = TEXT-003.
       RETURN.
     ENDIF.
 
     " Validate the priority value
-    IF iv_priority NS c_valid_priority.
-      rv_valid = abap_false.
+    IF c_valid_priority NS iv_priority.
+      rv_valid = TEXT-003.
       RETURN.
     ENDIF.
 
-    rv_valid = abap_true.
+    CLEAR rv_valid.
+    RETURN.
   ENDMETHOD.
 
   METHOD check_customer_exists.
